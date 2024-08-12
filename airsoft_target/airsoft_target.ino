@@ -1,21 +1,22 @@
 /*
 Скетч для страйкбольной мишени, которую можно поразить заданным количеством выстрелов в заданный период времени
-
+TODO устаканить мигания светодиодом, протестировать возрождение после определнного времени
 */
 
 #include <Button.h>
 #include <EEPROM.h>
 
 #define mic 14 // вход микрофона (А0)
-#define led 13 // выход на светодиод (2)
+#define led 2 // выход на светодиод 
 #define button_pin 3 // кнопка
 #define buzzer 4 // сигнал
-#define sens 100 //  настройка чувствительности 0...255 (~100 при фоновом 40)
+#define sens 90 //  настройка чувствительности 0...255 (~100 при фоновом 40)
 #define s_delay 100 // задержка для настройки эха микрофона
 
 Button button(button_pin);
 
 long kill_time = 60; // время за которое нужно попасть в секундах
+long dead_time = 60; // время когда прибор сигнализирует о смерти
 int max_hits_needed = 10; // максимальное количество попаданий для убийства
 int hits_needed;
 
@@ -36,7 +37,7 @@ void setup() {
     EEPROM.write(1, 3);
   }
   hits_needed = EEPROM.read(1);
-  if (button.pressed()){ // TODO найти метод зажатия кнопки переход в режим найстройки количества попаданий
+  if (button.pressed()){
     mode = 2;
     hits_counted = 0;
     Serial.println("settings");
@@ -75,6 +76,7 @@ void alive() { // режим ожидания попаданий
   if (hits_counted >= hits_needed & millis() - counting_start < kill_time * 1000) {
     mode = 1;
     hits_counted = 0;
+    counting_start = millis();
     Serial.println("dead");
   }
 
@@ -83,7 +85,7 @@ void alive() { // режим ожидания попаданий
 void dead() { // мертвый режим
   digitalWrite(buzzer, 1);
   digitalWrite(led, 1);
-  if (button.released()){
+  if (button.released() || millis() - counting_start > dead_time * 1000){
     delay_start = millis();
     mode = 0;
     digitalWrite(buzzer, 0);
