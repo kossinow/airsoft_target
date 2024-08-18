@@ -1,6 +1,6 @@
 /*
 Скетч для страйкбольной мишени, которую можно поразить заданным количеством выстрелов в заданный период времени
-TODO устаканить мигания светодиодом, протестировать возрождение после определнного времени
+TODO протестировать мигания светодиодом, протестировать возрождение после определнного времени
 */
 
 #include <Button.h>
@@ -26,7 +26,8 @@ long last_tick; // отсчет времени миганий
 int hits_counted = 0; // счетчик попаданий
 int hits_blinking_amount; // обратный счтечик для мигания настроек количества попаданий
 byte mode = 0; // флаг режимов
-bool led_state = true;
+bool led_state = false;
+bool released = false; // убеждаемся что кнопка отжата
 
 void setup() {
   pinMode(mic, INPUT);
@@ -37,12 +38,15 @@ void setup() {
     EEPROM.write(1, 3);
   }
   hits_needed = EEPROM.read(1);
+  //hits_needed = 2;
   if (button.pressed()){
     mode = 2;
-    hits_counted = 0;
+    digitalWrite(led, 1);
     Serial.println("settings");
   }
   Serial.begin(9600);
+  hits_counted = 0;
+  last_tick = millis();
 }
 
 void loop() {
@@ -97,26 +101,45 @@ void dead() { // мертвый режим
 
 void settings() { // режим настройки количества попаданий
 
-  if (button.released()){ // изменение количества попаданий
+  if (button.released() & released){ // изменение количества попаданий
     hits_needed ++;
-    if (hits_needed > 10){
+    if (hits_needed > max_hits_needed){
       hits_needed = 1;
     }
     EEPROM.write(1, hits_needed);
     last_tick = millis();
-    hits_blinking_amount = hits_needed * 2;
+    hits_blinking_amount = hits_needed;
+    led_state = false;
+    Serial.println(hits_needed);
   }
 
-  if (millis() - last_tick > 400 & hits_blinking_amount > 0){ // мигание показывающее количество необходимых попаданий
-    last_tick = millis();
-    hits_blinking_amount --;
-    led_state = !led_state;
+
+  if (hits_blinking_amount > 0){ // мигание показывающее количество необходимых попаданий
     digitalWrite(led, led_state);
+    if (millis() - last_tick > 400) {
+
+      last_tick = millis();
+      if (!led_state) {
+        led_state = true;
+              Serial.println(hits_blinking_amount);
+      Serial.println(led_state);
+      }
+      else {
+        led_state = false;
+        hits_blinking_amount --;
+            Serial.println(hits_blinking_amount);
+    Serial.println(led_state);
+      } 
+    }
   }
-  else if(millis() - last_tick > 1200 & hits_blinking_amount == 0) {
-    hits_blinking_amount = hits_needed * 2;
+  else {
     led_state = false;
-    digitalWrite(led, led_state);
+    if (millis() - last_tick > 1000){
+      last_tick = millis();
+      hits_blinking_amount = hits_needed;
+      released = true;
+    }
   }
+  
 
 }
